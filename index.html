@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Intake & Lookup Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;700&family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>🏥 clarityRx</h1>
+        <p>Please fill out the form or view existing patient records.</p>
+        <button id="view-patients-btn" class="header-action-btn">View All Patients</button> 
+    </header>
+
+    <main>
+        <section id="patient-form-section" class="card">
+            <form id="patient-form">
+                <fieldset>
+                    <legend>Personal Details</legend>
+                    <input type="text" id="name" placeholder="Full Name" required>
+                    <input type="number" id="age" placeholder="Age" min="1" max="120" required>
+                    <select id="sex" required>
+                        <option value="">Select Sex</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <input type="tel" id="number" placeholder="Phone Number (10 digits)" pattern="[0-9]{10}" required>
+                    <input type="text" id="address" placeholder="Full Address" required>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Medical History & Symptoms</legend>
+                    <label>Have you visited before?</label>
+                    <select id="last-visit-toggle" required>
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                    </select>
+                    <textarea id="last-visit-details" placeholder="Details of last visit (if yes)" style="display: none;"></textarea>
+                    
+                    <label for="symptoms">Main Symptoms (Be specific):</label>
+                    <textarea id="symptoms" required placeholder="Describe your main symptoms (e.g., severe chest pain, persistent headache, broken arm)"></textarea>
+                </fieldset>
+
+                <button type="submit" id="submit-btn">Register & Analyze</button>
+            </form>
+        </section>
+        
+        <section id="results-section" class="card" style="display: none;">
+            <h2>✅ Registration Complete</h2>
+            <div id="assigned-details" class="details-grid">
+                </div>
+            <button id="print-btn" class="secondary-btn">🖨️ Print Medical Card</button>
+            <button id="go-to-form-btn-results" class="primary-form-btn">← Go to Form/Homepage</button>
+        </section>
+
+        <section id="patient-lookup-section" class="card" style="display: none;">
+            <h2>📋 Patient Records Lookup</h2>
+            <div class="lookup-controls">
+                <select id="patient-selector">
+                    <option value="">Select a Patient (by ID or Name)</option>
+                </select>
+            </div>
+            
+            <div id="patient-card-display" class="details-grid lookup-card-display">
+                <p style="grid-column: 1 / -1; text-align: center; color: var(--text-muted);">Select a patient to view details.</p>
+                </div>
+            <button id="go-to-form-btn-lookup" class="primary-form-btn">← Go to Form/Homepage</button>
+        </section>
+    </main>
+
+    <div id="printable-area" class="printable-card">
+        </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

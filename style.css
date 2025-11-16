@@ -1,0 +1,395 @@
+/* --- 1. Root Variables & Typography (Elite Theme) --- */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;700&family=Montserrat:wght@400;500;700&display=swap');
+
+:root {
+    /* Primary Colors */
+    --primary-text: #17181A; 
+    --primary-brand: #36454F; /* Deep Slate Gray/Charcoal */
+    --accent-bronze: #8B876E; /* Muted Bronze/Olive for classic accents */
+    
+    /* Background & Surface Colors */
+    --body-background: #E8EBEF; 
+    --card-surface: #FFFFFF;
+    
+    /* Utility & Depth */
+    --border-line: #D1D5DB; 
+    --shadow-subtle: 0 4px 12px rgba(0, 0, 0, 0.08); 
+    --text-muted: #626C7A;
+    
+    /* Urgency Colors (Enhanced Contrast) */
+    --red: #B03A2E; 
+    --yellow: #D9880B; 
+    --green: #27AE60; 
+}
+
+/* --- 2. Base Styles & Global Structure --- */
+body {
+    font-family: 'Montserrat', sans-serif; 
+    background-color: var(--body-background);
+    margin: 0;
+    padding: 60px 20px; 
+    color: var(--primary-text);
+    line-height: 1.7;
+    min-height: 100vh;
+    box-sizing: border-box;
+}
+
+/* --- 3. Header & Title Styling --- */
+header {
+    text-align: center;
+    margin-bottom: 50px;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-line); 
+    animation: fadeIn 1s ease-out;
+    position: relative; 
+}
+
+h1 {
+    font-family: 'Cormorant Garamond', serif; 
+    font-size: 3.2em;
+    color: var(--primary-brand);
+    letter-spacing: 2px;
+    margin: 0;
+}
+
+header p {
+    color: var(--primary-text);
+    font-size: 1.2em;
+    font-style: italic;
+    opacity: 0.8;
+}
+
+.header-action-btn {
+    position: absolute;
+    top: 0px;
+    right: 0;
+    padding: 10px 20px;
+    background-color: var(--accent-bronze);
+    color: white;
+    border: none;
+    border-radius: 3px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    width: auto !important;
+}
+
+.header-action-btn:hover {
+    background-color: #9D9A87;
+}
+
+/* --- 4. Card & Section Styling --- */
+.card {
+    background-color: var(--card-surface);
+    max-width: 750px;
+    margin: 50px auto;
+    padding: 50px; 
+    border-radius: 4px; 
+    box-shadow: var(--shadow-subtle); 
+    border-top: 5px solid var(--accent-bronze); 
+    transition: transform 0.3s ease-out;
+    opacity: 0;
+    transform: translateY(30px);
+    animation: fadeInSlideUp 1s forwards 0.3s; 
+}
+
+.card:hover {
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12); 
+}
+
+/* --- 5. Form Elements --- */
+fieldset {
+    border: none; 
+    padding: 0;
+    padding-top: 15px; 
+    margin-bottom: 35px;
+}
+
+legend {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 700;
+    color: var(--primary-brand);
+    padding: 0;
+    font-size: 1.5em;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-line); 
+    display: inline-block;
+}
+
+input, select, textarea {
+    width: 100%;
+    padding: 18px 15px; 
+    margin-bottom: 20px;
+    border: 1px solid var(--border-line);
+    border-radius: 3px;
+    box-sizing: border-box;
+    font-size: 1em;
+    color: var(--primary-text);
+    transition: all 0.3s; 
+    background-color: #FDFDFD;
+}
+
+input:focus, select:focus, textarea:focus {
+    border-color: var(--accent-bronze);
+    box-shadow: 0 0 0 1px var(--accent-bronze);
+    background-color: #FFFFFF;
+    outline: none;
+}
+
+label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--primary-text);
+    opacity: 0.9;
+}
+
+/* --- 6. Buttons & Call-to-Action --- */
+button {
+    cursor: pointer;
+    padding: 18px 30px;
+    border: none;
+    border-radius: 3px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.3s ease-in-out;
+    width: 100%;
+    margin-top: 25px;
+}
+
+#submit-btn {
+    background-color: var(--primary-brand);
+    color: white;
+    font-size: 1.1em;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+#submit-btn:hover {
+    background-color: #4A5763;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
+
+.secondary-btn {
+    background-color: var(--accent-bronze);
+    color: white;
+    font-size: 1em;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.secondary-btn:hover {
+    background-color: #9D9A87;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.primary-form-btn { /* Style for Go to Form/Homepage button */
+    background-color: #A9A9A9; /* Darker grey for distinction */
+    color: white;
+    font-size: 1em;
+    margin-top: 10px;
+}
+
+.primary-form-btn:hover {
+    background-color: #808080;
+}
+
+/* --- 7. Results & Lookup Styling --- */
+#results-section h2, #patient-lookup-section h2 {
+    font-family: 'Cormorant Garamond', serif;
+    color: var(--accent-bronze);
+    text-align: center;
+    margin-bottom: 30px;
+    font-size: 2em;
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
+    padding: 30px;
+    border: 1px solid var(--accent-bronze); 
+    border-radius: 4px;
+    background-color: #FCFDFC; 
+}
+
+.lookup-card-display {
+    min-height: 150px;
+    align-items: center;
+}
+
+.detail-item {
+    background-color: var(--body-background);
+    padding: 15px;
+    border-radius: 2px;
+    border-left: 4px solid var(--primary-brand);
+}
+
+.detail-item.full-width {
+    grid-column: 1 / -1;
+}
+
+.detail-item strong {
+    display: block;
+    font-size: 0.8em;
+    color: var(--primary-text);
+    opacity: 0.6;
+    margin-bottom: 5px;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Urgency Color Tags - High Visibility */
+.red { color: white; background-color: var(--red); font-weight: 700; padding: 3px 8px; border-radius: 3px; display: inline-block;}
+.yellow { color: white; background-color: var(--yellow); font-weight: 700; padding: 3px 8px; border-radius: 3px; display: inline-block;}
+.green { color: white; background-color: var(--green); font-weight: 700; padding: 3px 8px; border-radius: 3px; display: inline-block;}
+
+/* Lookup Controls */
+.lookup-controls {
+    margin-bottom: 30px;
+}
+#patient-selector {
+    width: 100%;
+}
+
+
+/* --- 8. Animations --- */
+@keyframes fadeInSlideUp {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    to { opacity: 1; }
+}
+/* --- 9. Printable Area Styling (Clean and minimal) --- */
+.printable-card {
+    display: none; 
+    max-width: 850px;
+    margin: 50px auto;
+    padding: 50px;
+    border: 1px solid var(--border-line);
+    box-shadow: none;
+    background: white; 
+}
+
+.printable-card h3 {
+    font-family: 'Cormorant Garamond', serif;
+    text-align: center;
+    color: var(--primary-brand);
+    border-bottom: 2px solid var(--accent-bronze);
+    padding-bottom: 15px;
+    margin-bottom: 35px;
+    font-size: 2.2em;
+}
+
+.printable-card h4 {
+    font-family: 'Montserrat', sans-serif;
+    color: var(--primary-brand);
+    margin-top: 30px;
+    border-bottom: 1px solid var(--border-line);
+    padding-bottom: 5px;
+    font-size: 1.2em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.print-detail-group {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding: 8px 0;
+    /* Use a solid but light line for better print clarity */
+    border-bottom: 1px solid #E0E0E0; 
+    font-size: 1.1em;
+}
+
+.print-detail-group:last-of-type {
+    border-bottom: none;
+}
+
+.print-detail-group label {
+    font-weight: 700;
+    color: var(--primary-brand);
+    flex-basis: 35%; /* Control label width */
+    padding-right: 10px;
+}
+
+.print-detail-group p {
+    flex-basis: 65%;
+    text-align: right;
+    margin: 0;
+}
+
+.print-symptoms {
+    margin-top: 30px;
+    padding: 20px;
+    /* Print-friendly border style */
+    border: 1px solid var(--border-line); 
+    border-radius: 4px;
+    background-color: #F9F9F9;
+}
+.print-symptoms p { margin-top: 10px; white-space: pre-wrap; font-size: 1em; }
+
+/* --- 10. Print Media Query (Fixing Overflow) --- */
+@media print {
+    /* Ensure colors print cleanly (e.g., urgency backgrounds) */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    
+    body { 
+        background-color: white; 
+        padding: 0; 
+        margin: 0;
+    }
+    
+    body > *:not(.printable-card) {
+        display: none; 
+    }
+    
+    .printable-card {
+        display: block !important;
+        position: static !important; 
+        width: 95%;
+        max-width: 100%;
+        margin: 0;
+        padding: 40px 20px; /* Reduced side padding slightly for safety */
+        border: none;
+        box-shadow: none;
+        page-break-after: always; 
+    }
+
+    /* --- FIX: Force long words/IDs to wrap gracefully --- */
+    .print-detail-group p {
+        word-break: break-word; 
+        hyphens: auto;
+        font-weight: 400;
+        color: #000000;
+        flex-basis: 60%; /* Slightly adjust flex basis */
+    }
+    
+    .print-detail-group label {
+        flex-basis: 40%;
+    }
+
+    /* --- FIX: Ensure urgency tags are contained --- */
+    /* Print color for urgency tags (using background color explicitly) */
+    .red, .yellow, .green {
+        display: inline-block; /* Treat the color tag as a block for containment */
+        padding: 3px 5px !important; 
+        font-weight: 700;
+        border-radius: 3px;
+    }
+
+    .red { background-color: #B03A2E; color: white; border: 1px solid #B03A2E;} 
+    .yellow { background-color: #D9880B; color: white; border: 1px solid #D9880B;}
+    .green { background-color: #27AE60; color: white; border: 1px solid #27AE60;}
+}

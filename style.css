@@ -2,7 +2,7 @@
 
 :root{
   --bg:#f6f7fb;
-  --card:#fff;
+  --card:#f8fff7;
   --muted:#666;
   --primary:#1b6ef6;
   --danger:#e94b4b;
@@ -16,7 +16,7 @@
 body{
   font-family:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
   margin:0;
-  background:linear-gradient(180deg,#f6f7fb, #f3f5f9);
+  background:linear-gradient(180deg,#ffffff, #f1faf5);
   color:#111;
   display:flex;
   flex-direction:column;
@@ -33,7 +33,7 @@ body{
   align-items:center;
 }
 
-h1{margin:0;font-size:1.1rem}
+h1{margin:0;font-size:2rem;}
 main{width:100%;max-width:var(--max-width);padding:0 18px 40px}
 .card{
   background:var(--card);

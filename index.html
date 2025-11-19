@@ -1,79 +1,123 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Patient Intake & Lookup Portal</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;700&family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Clinic Intake — Hackathon</title>
+  <!--
+    Paste your deployed Apps Script Web App URL here:
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfy.../exec';
+    (See deployment steps below.)
+  -->
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-    <header>
-        <h1>🏥 clarityRx</h1>
-        <p>Please fill out the form or view existing patient records.</p>
-        <button id="view-patients-btn" class="header-action-btn">View All Patients</button> 
-    </header>
+  <header class="topbar">
+    <h1>Clinic Intake (Client-First)</h1>
+    <div>
+      <button id="btnViewAll" class="btn small">View all patients</button>
+    </div>
+  </header>
 
-    <main>
-        <section id="patient-form-section" class="card">
-            <form id="patient-form">
-                <fieldset>
-                    <legend>Personal Details</legend>
-                    <input type="text" id="name" placeholder="Full Name" required>
-                    <input type="number" id="age" placeholder="Age" min="1" max="120" required>
-                    <select id="sex" required>
-                        <option value="">Select Sex</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                    </select>
-                    <input type="tel" id="number" placeholder="Phone Number (10 digits)" pattern="[0-9]{10}" required>
-                    <input type="text" id="address" placeholder="Full Address" required>
-                </fieldset>
+  <main id="main">
+    <!-- Intake form -->
+    <section id="formView" class="card">
+      <h2>Patient Intake</h2>
+      <form id="intakeForm">
+        <label>
+          Name
+          <input name="name" id="name" required />
+        </label>
+        <label>
+          Age
+          <input name="age" id="age" type="number" min="0" required />
+        </label>
+        <label>
+          Gender
+          <select name="gender" id="gender">
+            <option value="">Prefer not to say</option>
+            <option>Female</option>
+            <option>Male</option>
+            <option>Other</option>
+          </select>
+        </label>
+        <label>
+          Phone
+          <input name="phone" id="phone" type="tel" />
+        </label>
+        <label>
+          Address
+          <input name="address" id="address" />
+        </label>
+        <label>
+          Symptoms (brief, describe main problems)
+          <textarea name="symptoms" id="symptoms" rows="4" required></textarea>
+        </label>
 
-                <fieldset>
-                    <legend>Medical History & Symptoms</legend>
-                    <label>Have you visited before?</label>
-                    <select id="last-visit-toggle" required>
-                        <option value="No">No</option>
-                        <option value="Yes">Yes</option>
-                    </select>
-                    <textarea id="last-visit-details" placeholder="Details of last visit (if yes)" style="display: none;"></textarea>
-                    
-                    <label for="symptoms">Main Symptoms (Be specific):</label>
-                    <textarea id="symptoms" required placeholder="Describe your main symptoms (e.g., severe chest pain, persistent headache, broken arm)"></textarea>
-                </fieldset>
+        <div id="llmStatus" class="muted">AI status: idle</div>
 
-                <button type="submit" id="submit-btn">Register & Analyze</button>
-            </form>
-        </section>
-        
-        <section id="results-section" class="card" style="display: none;">
-            <h2>✅ Registration Complete</h2>
-            <div id="assigned-details" class="details-grid">
-                </div>
-            <button id="print-btn" class="secondary-btn">🖨️ Print Medical Card</button>
-            <button id="go-to-form-btn-results" class="primary-form-btn">← Go to Form/Homepage</button>
-        </section>
-
-        <section id="patient-lookup-section" class="card" style="display: none;">
-            <h2>📋 Patient Records Lookup</h2>
-            <div class="lookup-controls">
-                <select id="patient-selector">
-                    <option value="">Select a Patient (by ID or Name)</option>
-                </select>
-            </div>
-            
-            <div id="patient-card-display" class="details-grid lookup-card-display">
-                <p style="grid-column: 1 / -1; text-align: center; color: var(--text-muted);">Select a patient to view details.</p>
-                </div>
-            <button id="go-to-form-btn-lookup" class="primary-form-btn">← Go to Form/Homepage</button>
-        </section>
-    </main>
-
-    <div id="printable-area" class="printable-card">
+        <div class="row">
+          <button id="btnSubmit" type="submit" class="btn primary">Submit & Triage (AI)</button>
+          <button id="btnClear" type="button" class="btn">Clear</button>
         </div>
+      </form>
 
-    <script src="script.js"></script>
+      <!-- Manual override (shown if LLM fails or user wants to override) -->
+      <div id="override" class="card small hidden">
+        <h3>Manual override (or confirm)</h3>
+        <label>
+          Urgency
+          <select id="overrideUrgency">
+            <option value="red">Red — Emergency</option>
+            <option value="yellow">Yellow — Needs review</option>
+            <option value="green">Green — Routine</option>
+          </select>
+        </label>
+        <label>
+          Doctor / Specialty
+          <input id="overrideDoctor" />
+        </label>
+        <label>
+          AI notes (editable)
+          <textarea id="overrideNotes" rows="3"></textarea>
+        </label>
+        <div class="row">
+          <button id="btnSaveManual" class="btn primary">Save to Sheet</button>
+          <button id="btnCancelManual" class="btn">Cancel</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Printable patient page -->
+    <section id="patientView" class="card hidden printable">
+      <button id="backFromPatient" class="btn small">← Back</button>
+      <div id="patientContent"></div>
+      <div class="row">
+        <button id="btnPrint" class="btn">Print</button>
+      </div>
+    </section>
+
+    <!-- All patients list -->
+    <section id="listView" class="card hidden">
+      <button id="backFromList" class="btn small">← Back</button>
+      <h2>All patients</h2>
+      <div id="listContainer" class="tablewrap">
+        <table id="patientsTable">
+          <thead>
+            <tr>
+              <th>ID</th><th>Name</th><th>Age</th><th>Urgency</th><th>Doctor</th><th>Time</th><th>Action</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot muted">
+    <small>Hackathon demo — client-first static app + Google Sheets backend</small>
+  </footer>
+
+  <script src="script.js"></script>
 </body>
 </html>

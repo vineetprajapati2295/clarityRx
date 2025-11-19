@@ -1,310 +1,331 @@
-document.addEventListener('DOMContentLoaded', () => {
-    
-    // !!! IMPORTANT: Replace this placeholder with your actual Google Apps Script Web App URL. !!!
-    const GOOGLE_SHEET_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw7moG5_ahXKv2XVUbmtIj7D10IZp_ffXoan6YKlmPcyjk1rW3ko1JZHPaywuM8UYQ/exec'; 
+const LLM_API_KEY = 'AIzaSyC27xH3CgXQIXYPQ5nBPXpXU7HibxeScTk'; // <-- Put your Gemini API key here
+const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const LLM_API = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwfhdh5i24ufnTlM4d-HtOl-fP5xWF_YciQc8kmIXnd6CIEdaM5p9YVhx1gPNTS12FJuw/exec'; // <-- Paste Apps Script web app URL here
 
-    // --- DOM Elements ---
-    const form = document.getElementById('patient-form');
-    const lastVisitToggle = document.getElementById('last-visit-toggle');
-    const lastVisitDetails = document.getElementById('last-visit-details');
-    const formSection = document.getElementById('patient-form-section');
-    const resultsSection = document.getElementById('results-section');
-    const assignedDetailsDiv = document.getElementById('assigned-details');
-    const printBtn = document.getElementById('print-btn');
-    const printableArea = document.getElementById('printable-area');
-    const viewPatientsBtn = document.getElementById('view-patients-btn');
-    const patientLookupSection = document.getElementById('patient-lookup-section');
-    const patientSelector = document.getElementById('patient-selector');
-    const patientCardDisplay = document.getElementById('patient-card-display');
-    
-    // New/Renamed Buttons for clarity and correct IDs
-    const goToFormResultsBtn = document.getElementById('go-to-form-btn-results');
-    const goToFormLookupBtn = document.getElementById('go-to-form-btn-lookup');
-    
-    // Global variable to store fetched patient data
-    let ALL_PATIENTS_DATA = [];
+/* DOM refs */
+const $ = id => document.getElementById(id);
+const form = $('intakeForm');
+const btnSubmit = $('btnSubmit');
+const btnClear = $('btnClear');
+const llmStatus = $('llmStatus');
+const overrideBox = $('override');
+const overrideUrgency = $('overrideUrgency');
+const overrideDoctor = $('overrideDoctor');
+const overrideNotes = $('overrideNotes');
+const btnSaveManual = $('btnSaveManual');
+const btnCancelManual = $('btnCancelManual');
+const patientView = $('patientView');
+const patientContent = $('patientContent');
+const backFromPatient = $('backFromPatient');
+const btnPrint = $('btnPrint');
+const listView = $('listView');
+const formView = $('formView');
+const patientsTableBody = document.querySelector('#patientsTable tbody');
+const btnViewAll = $('btnViewAll');
+const backFromList = $('backFromList');
 
-    // --- UTILITY FUNCTIONS ---
-    function hideAllSections() {
-        formSection.style.display = 'none';
-        resultsSection.style.display = 'none';
-        patientLookupSection.style.display = 'none';
+/* Allowed specialties for guidance only (we encourage model to pick from these, but we accept model output) */
+const ALLOWED_SPECIALTIES = [
+  "general physician","cardiologist","neurologist","pediatrician","gynecologist",
+  "pulmonologist","orthopedist","dermatologist","gastroenterologist","endocrinologist",
+  "urologist","nephrologist","rheumatologist","otolaryngologist","ophthalmologist",
+  "psychiatrist","infectious disease","hematologist","oncologist","vascular surgeon",
+  "plastic surgeon","general surgeon","obstetrician","pain specialist","allergist",
+  "immunologist","rehabilitation physician","sports medicine","sleep medicine",
+  "occupational medicine","palliative care","geriatrics","family physician",
+  "clinical pharmacologist","interventional cardiologist","cardiothoracic surgeon",
+  "neurosurgeon","addiction medicine","adolescent medicine"
+];
+
+/* Prompt: strict JSON-only + many examples (steering the model) */
+const TRIAGE_PROMPT_INSTRUCTIONS = `
+You are a concise medical triage assistant. Analyze the patient's short symptom text and return ONLY a single JSON object
+with exactly these fields:
+  - "urgency": one of "red", "yellow", "green"
+  - "doctor": a single short specialty label (e.g., "cardiologist", "dermatologist", "general physician", etc.)
+  - "ai_notes": short plain-language triage rationale (max ~70 words)
+
+Guidance:
+- Prefer a specific specialty when appropriate (don't default to "general physician" unless necessary).
+- You may choose any reasonable specialty label — it does NOT have to be restricted to a short curated list, but prefer named specialties.
+- Return JSON only, no extra commentary, no markdown, nothing else.
+
+Examples (INPUT -> OUTPUT):
+1) "sudden chest tightness, sweating, radiating pain to left arm, feeling faint"
+-> {"urgency":"red","doctor":"cardiologist","ai_notes":"Suspected acute coronary syndrome: chest tightness with arm radiation and diaphoresis — treat as emergency and arrange immediate cardiology evaluation."}
+
+2) "mild sore throat, runny nose, low fever for 1 day, can eat and drink"
+-> {"urgency":"green","doctor":"general physician","ai_notes":"Likely mild viral upper respiratory infection; symptomatic care and primary care follow-up if worsening."}
+
+3) "high fever 39C, fast breathing, cough, child struggling to breathe"
+-> {"urgency":"red","doctor":"pediatrician","ai_notes":"Child with high fever and respiratory distress — urgent pediatric/ED evaluation required."}
+
+4) "intermittent blood in stool for 2 weeks, weight loss"
+-> {"urgency":"yellow","doctor":"gastroenterologist","ai_notes":"Rectal bleeding with weight loss — expedited gastroenterology assessment and colonoscopy indicated."}
+
+5) "blurry vision and floaters in one eye, sudden onset"
+-> {"urgency":"yellow","doctor":"ophthalmologist","ai_notes":"Acute visual changes — ophthalmology review recommended to assess retinal detachment or vitreous pathology."}
+
+6) "worsening knee pain after sport injury, swollen and can't fully extend"
+-> {"urgency":"yellow","doctor":"orthopedist","ai_notes":"Likely ligament or meniscal injury — orthopedic evaluation and imaging recommended."}
+
+7) "severe right lower abdominal pain with fever and nausea"
+-> {"urgency":"red","doctor":"general surgeon","ai_notes":"Symptoms consistent with possible acute appendicitis — urgent surgical assessment recommended."}
+
+8) "progressive fatigue, easy bruising, unexplained anemia on labs"
+-> {"urgency":"yellow","doctor":"hematologist","ai_notes":"Lab evidence of cytopenia and systemic symptoms—hematology workup indicated."}
+`;
+
+/* Utility: extract JSON block from text */
+function extractJSONFromText(text){
+  if(!text || typeof text !== 'string') return null;
+  const start = text.indexOf('{');
+  if(start === -1) return null;
+  let depth = 0;
+  for(let i=start;i<text.length;i++){
+    if(text[i] === '{') depth++;
+    else if(text[i] === '}'){
+      depth--;
+      if(depth === 0){
+        const candidate = text.slice(start, i+1);
+        try { return JSON.parse(candidate); } catch(e){ break; }
+      }
+    }
+  }
+  const simple = text.match(/\{[\s\S]*\}/);
+  if(simple){
+    try { return JSON.parse(simple[0]); } catch(e) {}
+  }
+  return null;
+}
+
+/* Minimal fallback only for unparsable model output — we do NOT map keywords to specialties here */
+function minimalFallback(symptoms, rawText){
+  // If model output cannot be parsed at all, we return a safe default and include the raw model output
+  return {
+    urgency: 'yellow',
+    doctor: 'general physician',
+    ai_notes: `(PARSE_FAIL) Could not parse model output. Raw model text: ${String(rawText).slice(0,300)}`
+  };
+}
+
+/* LLM call — always rely on model to pick specialty */
+async function callLLM(symptoms){
+  if(!LLM_API_KEY || LLM_API_KEY === 'REPLACE_WITH_KEY') throw new Error('LLM_API_KEY not set in script.js');
+
+  const prompt = TRIAGE_PROMPT_INSTRUCTIONS + `\nPatient symptoms: "${symptoms}"\nReturn only the JSON object.`;
+  const body = { contents: [ { parts: [ { text: prompt } ] } ] };
+
+  console.log('Calling LLM (preview):', prompt.slice(0,200));
+  try {
+    const resp = await fetch(LLM_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': LLM_API_KEY },
+      body: JSON.stringify(body)
+    });
+    const json = await resp.json().catch(e => { throw new Error('Failed to parse LLM JSON: ' + e.message); });
+    const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text || json?.candidates?.[0]?.content?.[0]?.text || JSON.stringify(json);
+    console.log('LLM rawText:', rawText.slice(0,400));
+
+    // Attempt to extract JSON block returned by model
+    let parsed = extractJSONFromText(rawText);
+    if(!parsed){
+      // parsing failed — use only minimal fallback and include rawText in ai_notes
+      console.warn('Model output could not be parsed as JSON. Using minimal fallback.');
+      return {...minimalFallback(symptoms, rawText), raw: rawText};
     }
 
-    function showSection(section) {
-        hideAllSections();
-        section.style.display = 'block';
+    // If parsed, accept model's doctor as-is (after light normalization)
+    parsed.doctor = (parsed.doctor || '').toString().trim();
+    parsed.urgency = (parsed.urgency || '').toString().trim().toLowerCase();
+    parsed.ai_notes = (parsed.ai_notes || '').toString().slice(0,400);
+
+    // Validate urgency, fallback to 'yellow' if invalid
+    if(!['red','yellow','green'].includes(parsed.urgency)) parsed.urgency = 'yellow';
+
+    // If doctor is empty or nonsense, fallback to general physician but include rawText
+    if(!parsed.doctor) {
+      parsed.doctor = 'general physician';
+      parsed.ai_notes = `(MISSING_DOCTOR) ${parsed.ai_notes} | Raw: ${rawText.slice(0,200)}`;
     }
 
-    // --- EVENT LISTENERS ---
+    return {...parsed, raw: rawText};
+  } catch(err){
+    console.error('LLM call failed:', err);
+    return { urgency:'yellow', doctor:'general physician', ai_notes:`LLM error: ${err.message}`, raw: String(err) };
+  }
+}
 
-    lastVisitToggle.addEventListener('change', () => {
-        lastVisitDetails.style.display = lastVisitToggle.value === 'Yes' ? 'block' : 'none';
-        lastVisitDetails.required = lastVisitToggle.value === 'Yes';
-    });
+/* Patient ID generator */
+function generatePatientId(){ return `P${Date.now()}-${Math.floor(1000+Math.random()*9000)}`; }
 
-    // Form Submission (CRITICAL FIX FOR COLUMN MAPPING)
-    form.addEventListener('submit', function(event) {
-        event.preventDefault();
-        
-        // 1. Collect & Assign Data
-        const patientData = {
-            name: document.getElementById('name').value,
-            age: parseInt(document.getElementById('age').value),
-            sex: document.getElementById('sex').value,
-            number: document.getElementById('number').value,
-            address: document.getElementById('address').value,
-            lastVisit: document.getElementById('last-visit-toggle').value,
-            lastVisitDetails: document.getElementById('last-visit-details').value,
-            symptoms: document.getElementById('symptoms').value
-        };
-
-        const { uniqueId, urgencyCode, doctorType } = assignUniqueDetails(patientData.symptoms, patientData.age);
-
-        // 2. CREATE THE FINAL DATA OBJECT IN THE EXACT ORDER OF THE SHEET HEADERS (EXCEPT TIMESTAMP)
-        // Order: name, age, sex, number, address, lastVisit, lastVisitDetails, symptoms, uniqueId, urgencyCode, doctorType
-        const finalData = { 
-            name: patientData.name,
-            age: patientData.age,
-            sex: patientData.sex,
-            number: patientData.number,
-            address: patientData.address,
-            lastVisit: patientData.lastVisit,
-            lastVisitDetails: patientData.lastVisitDetails,
-            symptoms: patientData.symptoms,
-            uniqueId: uniqueId,
-            urgencyCode: urgencyCode,
-            doctorType: doctorType
-        };
-
-        // Process & Show
-        const displayData = { ...patientData, uniqueId, urgencyCode, doctorType };
-        displayResults(displayData); 
-        pushToGoogleSheet(finalData); 
-        setupPrintablePage(displayData);
-        
-        showSection(resultsSection);
-    });
-
-    // View Patients Button (Switches to Lookup View)
-    viewPatientsBtn.addEventListener('click', () => {
-        showSection(patientLookupSection);
-        fetchAllPatients();
-    });
-    
-    // Go to Homepage Buttons
-    goToFormResultsBtn.addEventListener('click', () => showSection(formSection));
-    goToFormLookupBtn.addEventListener('click', () => showSection(formSection));
-
-    // Patient Selector (Lookup Logic)
-    patientSelector.addEventListener('change', () => {
-        const selectedId = patientSelector.value;
-        if (selectedId) {
-            const patient = ALL_PATIENTS_DATA.find(p => p.uniqueId === selectedId);
-            if (patient) {
-                renderPatientCard(patient);
-            }
+/* Apps Script interaction — robust save with retries */
+async function saveToSheet(record){
+  if(!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('REPLACE_WITH')) throw new Error('APPS_SCRIPT_URL not set');
+  const maxAttempts = 3;
+  let attempt = 0;
+  while(attempt < maxAttempts){
+    attempt++;
+    try {
+      const res = await fetch(APPS_SCRIPT_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(record) });
+      if(!res.ok){
+        const status = res.status;
+        const txt = await res.text().catch(()=>'');
+        if(status === 429 || (status >=500 && status <600)){
+          // retry
+          const wait = 500 * Math.pow(2, attempt-1);
+          console.warn(`saveToSheet attempt ${attempt} got ${status}. Retrying after ${wait}ms.`);
+          await new Promise(r=>setTimeout(r, wait));
+          continue;
         } else {
-            patientCardDisplay.innerHTML = `<p style="grid-column: 1 / -1; text-align: center; color: var(--text-muted);">Select a patient to view details.</p>`;
+          throw new Error(`Apps Script HTTP ${status}: ${txt || res.statusText}`);
         }
-    });
-
-    // Print Button Handler
-    printBtn.addEventListener('click', () => {
-        window.print();
-    });
-
-    // --- CORE LOGIC FUNCTIONS ---
-
-    function assignUniqueDetails(symptoms, age) {
-        const uniqueId = 'P-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase();
-        
-        let doctorType = 'General Practitioner';
-        let urgencyCode = 'GREEN'; 
-
-        const lowerSymptoms = symptoms.toLowerCase();
-
-        // Doctor Type Analysis
-        if (lowerSymptoms.includes('chest pain') || lowerSymptoms.includes('heart')) {
-            doctorType = 'Cardiologist';
-        } else if (lowerSymptoms.includes('broken') || lowerSymptoms.includes('fracture') || lowerSymptoms.includes('joint') || lowerSymptoms.includes('bone')) {
-            doctorType = 'Orthopedic';
-        } else if (lowerSymptoms.includes('headache') || lowerSymptoms.includes('seizure') || lowerSymptoms.includes('numbness') || lowerSymptoms.includes('stroke')) {
-            doctorType = 'Neurologist';
-        } else if (lowerSymptoms.includes('pregnant') || lowerSymptoms.includes('menstrual') || lowerSymptoms.includes('vaginal')) {
-            doctorType = 'Gyno';
-        }
-        
-        // Urgency Code Analysis
-        if (lowerSymptoms.includes('severe chest pain') || lowerSymptoms.includes('unconscious') || lowerSymptoms.includes('heavy bleeding')) {
-            urgencyCode = 'RED'; 
-        } else if (lowerSymptoms.includes('broken') || lowerSymptoms.includes('high fever') || lowerSymptoms.includes('difficulty breathing') || lowerSymptoms.includes('persistent vomiting')) {
-            urgencyCode = 'YELLOW'; 
-        }
-        
-        // Age adjustment for Urgency
-        if (urgencyCode === 'GREEN' && (age < 5 || age > 75)) {
-            urgencyCode = 'YELLOW';
-        }
-
-        return { uniqueId, urgencyCode, doctorType };
+      }
+      const payload = await res.json().catch(async e => { const raw = await res.text().catch(()=>''); throw new Error('Non-JSON Apps Script response: '+raw); });
+      return payload;
+    } catch(err){
+      const last = attempt >= maxAttempts;
+      console.error('saveToSheet error:', err.message);
+      if(last) throw new Error(`Failed to save after ${attempt} attempts: ${err.message}`);
+      await new Promise(r=>setTimeout(r, 400 * Math.pow(2, attempt-1)));
     }
+  }
+}
 
-    function displayResults(data) {
-        const urgencyClass = data.urgencyCode.toLowerCase();
-        
-        assignedDetailsDiv.innerHTML = `
-            <div class="detail-item"><strong>Patient ID:</strong> ${data.uniqueId}</div>
-            <div class="detail-item"><strong>Doctor Assigned:</strong> ${data.doctorType}</div>
-            <div class="detail-item"><strong>Urgency Code:</strong> <span class="${urgencyClass}">${data.urgencyCode}</span></div>
-            <div class="detail-item"><strong>Next Action:</strong> ${data.urgencyCode === 'RED' ? 'Immediate Admission' : 'Wait in Lounge'}</div>
-        `;
-        form.reset(); 
+/* fetch list */
+async function fetchAllPatients(){
+  try {
+    const res = await fetch(APPS_SCRIPT_URL);
+    const data = await res.json();
+    return data;
+  } catch(err){
+    throw new Error('Failed to fetch patients: ' + err.message);
+  }
+}
+
+/* UI helpers */
+function setStatus(t){ if(llmStatus) llmStatus.textContent = `AI status: ${t}`; }
+function escapeHtml(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function showPatientPage(p){
+  formView.classList.add('hidden'); listView.classList.add('hidden'); patientView.classList.remove('hidden');
+  const pillClass = `pill ${p.urgency || 'yellow'}`;
+  patientContent.innerHTML = `
+    <h2>Patient: ${escapeHtml(p.name||'')} <span style="font-weight:600">(${p.id})</span></h2>
+    <div><strong>Age:</strong> ${escapeHtml(p.age||'')} &nbsp; <strong>Gender:</strong> ${escapeHtml(p.gender||'')}</div>
+    <div><strong>Phone:</strong> ${escapeHtml(p.phone||'')}</div>
+    <div><strong>Address:</strong> ${escapeHtml(p.address||'')}</div>
+    <hr/>
+    <div><strong>Symptoms:</strong><div style="margin-top:6px">${escapeHtml(p.symptoms||'')}</div></div>
+    <div style="margin-top:10px">
+      <span class="${pillClass}">${(p.urgency||'').toUpperCase()}</span>
+      <span style="margin-left:12px"><strong>Doctor:</strong> ${escapeHtml(p.doctor||'')}</span>
+    </div>
+    <div style="margin-top:12px"><strong>AI notes:</strong><div style="margin-top:6px">${escapeHtml(p.ai_notes||'')}</div></div>
+    <details style="margin-top:12px;color:#666"><summary>Raw AI output</summary><pre style="white-space:pre-wrap">${escapeHtml(p.raw||'')}</pre></details>
+  `;
+}
+
+/* table render */
+function renderPatientsTable(rows){
+  patientsTableBody.innerHTML = '';
+  if(!Array.isArray(rows)) return;
+  rows.slice().reverse().forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(r.id||'')}</td>
+      <td>${escapeHtml(r.name||'')}</td>
+      <td>${escapeHtml(r.age||'')}</td>
+      <td><span class="pill ${r.urgency||'yellow'}">${(r.urgency||'').toUpperCase()}</span></td>
+      <td>${escapeHtml(r.doctor||'')}</td>
+      <td>${escapeHtml(r.timestamp||'')}</td>
+      <td><button class="btn small viewBtn" data-id="${escapeHtml(r.id||'')}">View</button></td>
+    `;
+    patientsTableBody.appendChild(tr);
+  });
+  document.querySelectorAll('.viewBtn').forEach(b => b.addEventListener('click', async ev=>{
+    const id = ev.currentTarget.dataset.id;
+    try { setStatus('fetching...'); const all = await fetchAllPatients(); const found = (all||[]).find(x=>x.id===id); if(found) showPatientPage(found); else alert('Not found'); }
+    catch(e){ alert('Error: '+e.message); } finally { setStatus('idle'); }
+  }));
+}
+
+/* form submit flow */
+form.addEventListener('submit', async ev=>{
+  ev.preventDefault();
+  const fd = new FormData(form);
+  const patient = Object.fromEntries(fd.entries());
+  patient.symptoms = (patient.symptoms||'').trim();
+  if(!patient.symptoms){ alert('Please enter symptoms'); return; }
+  patient.id = generatePatientId();
+  patient.timestamp = new Date().toISOString();
+
+  setStatus('calling LLM...');
+  btnSubmit.disabled = true;
+  try {
+    const ai = await callLLM(patient.symptoms);
+    setStatus('LLM response received');
+
+    const parseFailed = (ai.ai_notes||'').startsWith('(PARSE_FAIL)') || (ai.ai_notes||'').startsWith('LLM error:');
+
+    const triage = { urgency: ai.urgency||'yellow', doctor: ai.doctor||'general physician', ai_notes: ai.ai_notes||'', raw: ai.raw||'' };
+
+    // prefill override fields so user can change if they want
+    overrideUrgency.value = triage.urgency;
+    overrideDoctor.value = triage.doctor;
+    overrideNotes.value = triage.ai_notes;
+
+    showPatientPage({...patient, ...triage});
+
+    if(parseFailed){
+      overrideBox.classList.remove('hidden');
+      setStatus('AI parse issues — review before saving.');
+    } else {
+      // auto-save
+      try { await doSaveRecord({...patient,...triage}); }
+      catch(saveErr){ console.error('Auto-save failed', saveErr); overrideBox.classList.remove('hidden'); overrideNotes.value = 'Save failed: '+saveErr.message; alert('Auto-save failed. Please Save to Sheet manually.'); setStatus('idle'); }
     }
-
-    function setupPrintablePage(data) {
-        printableArea.innerHTML = `
-            <h3>Patient Medical Intake Card</h3>
-            <div class="print-detail-group">
-                <label>Date/Time:</label>
-                <p>${new Date().toLocaleString()}</p>
-            </div>
-            
-            <div class="print-detail-group">
-                <label>Patient ID:</label>
-                <p class="${data.urgencyCode.toLowerCase()}">${data.uniqueId}</p>
-            </div>
-            
-            <div class="print-detail-group">
-                <label>Urgency Code:</label>
-                <p class="${data.urgencyCode.toLowerCase()}">${data.urgencyCode}</p>
-            </div>
-            
-            <div class="print-detail-group">
-                <label>Assigned Doctor:</label>
-                <p>${data.doctorType}</p>
-            </div>
-
-            <h4>--- Personal Details ---</h4>
-            <div class="print-detail-group">
-                <label>Name:</label>
-                <p>${data.name}</p>
-                <label>Age/Sex:</label>
-                <p>${data.age} / ${data.sex}</p>
-            </div>
-
-            <div class="print-detail-group">
-                <label>Phone:</label>
-                <p>${data.number}</p>
-            </div>
-
-            <div class="print-detail-group">
-                <label>Address:</label>
-                <p>${data.address}</p>
-            </div>
-
-            <h4>--- Medical Details ---</h4>
-            <div class="print-detail-group">
-                <label>Last Visit:</label>
-                <p>${data.lastVisit}</p>
-            </div>
-            ${data.lastVisit === 'Yes' ? `<div class="print-symptoms"><label>Last Visit Summary:</label><p>${data.lastVisitDetails || 'N/A'}</p></div>` : ''}
-
-            <div class="print-symptoms">
-                <label>Reported Symptoms:</label>
-                <p>${data.symptoms}</p>
-            </div>
-            
-            <p style="text-align: center; margin-top: 30px; font-style: italic;">Please present this card at the reception desk.</p>
-        `;
-    }
-
-    // --- GOOGLE SHEET INTEGRATION (POST - Submission) ---
-    function pushToGoogleSheet(data) {
-        const formData = new FormData();
-        // The data keys match the order required by the Apps Script
-        for (const key in data) {
-            formData.append(key, data[key]);
-        }
-
-        fetch(GOOGLE_SHEET_WEB_APP_URL, {
-            method: 'POST',
-            body: formData,
-            mode: 'no-cors' 
-        })
-        .then(() => console.log('Data submission attempt sent to Google Sheet.'))
-        .catch(error => console.error('Error submitting data:', error));
-    }
-    
-    // --- GOOGLE SHEET INTEGRATION (GET - Lookup) ---
-    async function fetchAllPatients() {
-        patientSelector.innerHTML = '<option value="">Loading Patients...</option>';
-        patientSelector.disabled = true;
-
-        try {
-            const response = await fetch(GOOGLE_SHEET_WEB_APP_URL + '?action=getPatients');
-            
-            const text = await response.text();
-            let data;
-            try {
-                data = JSON.parse(text);
-            } catch (e) {
-                console.error('Error parsing JSON:', text);
-                patientSelector.innerHTML = '<option value="">Error fetching data (Server response not JSON)</option>';
-                return;
-            }
-
-            if (data.patients && data.patients.length > 0) {
-                ALL_PATIENTS_DATA = data.patients;
-                populatePatientSelector(data.patients);
-            } else {
-                patientSelector.innerHTML = '<option value="">No patients found</option>';
-            }
-
-        } catch (error) {
-            console.error('Fetch error:', error);
-            patientSelector.innerHTML = '<option value="">Error connecting to server</option>';
-        } finally {
-            patientSelector.disabled = false;
-        }
-    }
-
-    function populatePatientSelector(patients) {
-        let options = '<option value="">Select a Patient (by ID or Name)</option>';
-        patients.forEach(p => {
-            options += `<option value="${p.uniqueId}">${p.name} (${p.uniqueId})</option>`;
-        });
-        patientSelector.innerHTML = options;
-    }
-
-    function renderPatientCard(data) {
-        const urgencyClass = data.urgencyCode.toLowerCase();
-        
-        patientCardDisplay.innerHTML = `
-            <div class="detail-item full-width"><strong>Record Time:</strong> ${data.timestamp}</div>
-
-            <div class="detail-item"><strong>Patient Name:</strong> ${data.name}</div>
-            <div class="detail-item"><strong>Patient ID:</strong> <span class="${urgencyClass}">${data.uniqueId}</span></div>
-            
-            <div class="detail-item"><strong>Age/Sex:</strong> ${data.age} / ${data.sex}</div>
-            <div class="detail-item"><strong>Phone:</strong> ${data.number}</div>
-
-            <div class="detail-item"><strong>Doctor Assigned:</strong> ${data.doctorType}</div>
-            <div class="detail-item"><strong>Urgency Code:</strong> <span class="${urgencyClass}">${data.urgencyCode}</span></div>
-
-            <div class="detail-item full-width">
-                <strong>Address:</strong> ${data.address}
-            </div>
-
-            <div class="detail-item full-width">
-                <strong>Symptoms Reported:</strong> ${data.symptoms}
-            </div>
-            
-            <div class="detail-item full-width">
-                <strong>Last Visit:</strong> ${data.lastVisit}
-                ${data.lastVisit === 'Yes' ? `<br><span>Details: ${data.lastVisitDetails || 'N/A'}</span>` : ''}
-            </div>
-        `;
-    }
-
+  } catch(err){
+    console.error('Triage error', err);
+    alert('Error: '+err.message);
+    overrideBox.classList.remove('hidden');
+    overrideNotes.value = 'LLM flow error: '+err.message;
+    setStatus('idle');
+  } finally { btnSubmit.disabled = false; }
 });
+
+/* manual save */
+btnSaveManual.addEventListener('click', async ()=>{
+  const fd = new FormData(form);
+  const patient = Object.fromEntries(fd.entries());
+  patient.symptoms = (patient.symptoms||'').trim();
+  if(!patient.symptoms){ alert('Missing symptoms'); return; }
+  patient.id = generatePatientId();
+  patient.timestamp = new Date().toISOString();
+  patient.urgency = overrideUrgency.value;
+  patient.doctor = overrideDoctor.value || 'general physician';
+  patient.ai_notes = overrideNotes.value || '';
+  patient.raw = patient.ai_notes;
+  try { await doSaveRecord(patient); overrideBox.classList.add('hidden'); } catch(e){ alert('Save failed: '+e.message); }
+});
+btnCancelManual.addEventListener('click', ()=>{ overrideBox.classList.add('hidden'); formView.classList.remove('hidden'); patientView.classList.add('hidden'); });
+
+async function doSaveRecord(record){
+  setStatus('saving to sheet...');
+  try {
+    const res = await saveToSheet(record);
+    if(res && res.success){ setStatus('saved'); alert('Saved successfully (ID: '+(record.id||'')+')'); showPatientPage(record); form.reset(); }
+    else throw new Error(JSON.stringify(res));
+  } catch(err){ setStatus('save failed'); throw err; }
+}
+
+/* UI extras */
+btnClear.addEventListener('click', ()=>form.reset());
+backFromPatient.addEventListener('click', ()=>{ patientView.classList.add('hidden'); formView.classList.remove('hidden'); });
+btnPrint.addEventListener('click', ()=>window.print());
+btnViewAll.addEventListener('click', async ()=>{ formView.classList.add('hidden'); patientView.classList.add('hidden'); listView.classList.remove('hidden'); setStatus('loading'); try{ const data = await fetchAllPatients(); renderPatientsTable(Array.isArray(data)?data:[]); setStatus('idle'); }catch(e){ setStatus('idle'); alert('Error: '+e.message); }});
+backFromList.addEventListener('click', ()=>{ listView.classList.add('hidden'); formView.classList.remove('hidden'); });
+
+/* init */
+(function init(){ setStatus('idle'); console.log('AI-first specialties: model decides doctor; fallback only on parse failure.'); })();

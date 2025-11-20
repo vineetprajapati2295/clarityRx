@@ -4,11 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>ClarityRx</title>
-  <!--
-    Paste your deployed Apps Script Web App URL here:
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfy.../exec';
-    (See deployment steps below.)
-  -->
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -20,7 +15,6 @@
   </header>
 
   <main id="main">
-    <!-- Intake form -->
     <section id="formView" class="card">
       <h2>Patient Intake</h2>
       <form id="intakeForm">
@@ -62,7 +56,6 @@
         </div>
       </form>
 
-      <!-- Manual override (shown if LLM fails or user wants to override) -->
       <div id="override" class="card small hidden">
         <h3>Manual override (or confirm)</h3>
         <label>
@@ -88,7 +81,6 @@
       </div>
     </section>
 
-    <!-- Printable patient page -->
     <section id="patientView" class="card hidden printable">
       <button id="backFromPatient" class="btn small">← Back</button>
       <div id="patientContent"></div>
@@ -97,7 +89,6 @@
       </div>
     </section>
 
-    <!-- All patients list -->
     <section id="listView" class="card hidden">
       <button id="backFromList" class="btn small">← Back</button>
       <h2>All patients</h2>
@@ -121,5 +112,3 @@
   <script src="script.js"></script>
 </body>
 </html>
-
-

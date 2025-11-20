@@ -1,6 +1,6 @@
 :root{
   --bg:#f6f7fb;
-  --card:#f8fff7;
+  --card:#dcffd7;
   --muted:#666;
   --primary:#1b6ef6;
   --danger:#e94b4b;
@@ -83,3 +83,4 @@ th{background:transparent;color:var(--muted);font-weight:600}
   .topbar{margin:12px}
   main{padding:0 12px 40px}
 }
+

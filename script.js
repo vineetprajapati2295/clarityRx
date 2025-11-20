@@ -1,9 +1,8 @@
-const LLM_API_KEY = 'AIzaSyC27xH3CgXQIXYPQ5nBPXpXU7HibxeScTk'; // <-- Put your Gemini API key here
+const LLM_API_KEY = 'AIzaSyC27xH3CgXQIXYPQ5nBPXpXU7HibxeScTk';
 const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 const LLM_API = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwfhdh5i24ufnTlM4d-HtOl-fP5xWF_YciQc8kmIXnd6CIEdaM5p9YVhx1gPNTS12FJuw/exec'; // <-- Paste Apps Script web app URL here
 
-/* DOM refs */
 const $ = id => document.getElementById(id);
 const form = $('intakeForm');
 const btnSubmit = $('btnSubmit');
@@ -25,7 +24,6 @@ const patientsTableBody = document.querySelector('#patientsTable tbody');
 const btnViewAll = $('btnViewAll');
 const backFromList = $('backFromList');
 
-/* Allowed specialties for guidance only (we encourage model to pick from these, but we accept model output) */
 const ALLOWED_SPECIALTIES = [
   "general physician","cardiologist","neurologist","pediatrician","gynecologist",
   "pulmonologist","orthopedist","dermatologist","gastroenterologist","endocrinologist",
@@ -38,7 +36,6 @@ const ALLOWED_SPECIALTIES = [
   "neurosurgeon","addiction medicine","adolescent medicine"
 ];
 
-/* Prompt: strict JSON-only + many examples (steering the model) */
 const TRIAGE_PROMPT_INSTRUCTIONS = `
 You are a concise medical triage assistant. Analyze the patient's short symptom text and return ONLY a single JSON object
 with exactly these fields:
@@ -77,7 +74,6 @@ Examples (INPUT -> OUTPUT):
 -> {"urgency":"yellow","doctor":"hematologist","ai_notes":"Lab evidence of cytopenia and systemic symptoms—hematology workup indicated."}
 `;
 
-/* Utility: extract JSON block from text */
 function extractJSONFromText(text){
   if(!text || typeof text !== 'string') return null;
   const start = text.indexOf('{');
@@ -100,9 +96,7 @@ function extractJSONFromText(text){
   return null;
 }
 
-/* Minimal fallback only for unparsable model output — we do NOT map keywords to specialties here */
 function minimalFallback(symptoms, rawText){
-  // If model output cannot be parsed at all, we return a safe default and include the raw model output
   return {
     urgency: 'yellow',
     doctor: 'general physician',
@@ -110,7 +104,6 @@ function minimalFallback(symptoms, rawText){
   };
 }
 
-/* LLM call — always rely on model to pick specialty */
 async function callLLM(symptoms){
   if(!LLM_API_KEY || LLM_API_KEY === 'REPLACE_WITH_KEY') throw new Error('LLM_API_KEY not set in script.js');
 
@@ -128,23 +121,18 @@ async function callLLM(symptoms){
     const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text || json?.candidates?.[0]?.content?.[0]?.text || JSON.stringify(json);
     console.log('LLM rawText:', rawText.slice(0,400));
 
-    // Attempt to extract JSON block returned by model
     let parsed = extractJSONFromText(rawText);
     if(!parsed){
-      // parsing failed — use only minimal fallback and include rawText in ai_notes
       console.warn('Model output could not be parsed as JSON. Using minimal fallback.');
       return {...minimalFallback(symptoms, rawText), raw: rawText};
     }
 
-    // If parsed, accept model's doctor as-is (after light normalization)
     parsed.doctor = (parsed.doctor || '').toString().trim();
     parsed.urgency = (parsed.urgency || '').toString().trim().toLowerCase();
     parsed.ai_notes = (parsed.ai_notes || '').toString().slice(0,400);
 
-    // Validate urgency, fallback to 'yellow' if invalid
     if(!['red','yellow','green'].includes(parsed.urgency)) parsed.urgency = 'yellow';
 
-    // If doctor is empty or nonsense, fallback to general physician but include rawText
     if(!parsed.doctor) {
       parsed.doctor = 'general physician';
       parsed.ai_notes = `(MISSING_DOCTOR) ${parsed.ai_notes} | Raw: ${rawText.slice(0,200)}`;
@@ -157,10 +145,8 @@ async function callLLM(symptoms){
   }
 }
 
-/* Patient ID generator */
 function generatePatientId(){ return `P${Date.now()}-${Math.floor(1000+Math.random()*9000)}`; }
 
-/* Apps Script interaction — robust save with retries */
 async function saveToSheet(record){
   if(!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('REPLACE_WITH')) throw new Error('APPS_SCRIPT_URL not set');
   const maxAttempts = 3;
@@ -173,7 +159,6 @@ async function saveToSheet(record){
         const status = res.status;
         const txt = await res.text().catch(()=>'');
         if(status === 429 || (status >=500 && status <600)){
-          // retry
           const wait = 500 * Math.pow(2, attempt-1);
           console.warn(`saveToSheet attempt ${attempt} got ${status}. Retrying after ${wait}ms.`);
           await new Promise(r=>setTimeout(r, wait));
@@ -193,7 +178,6 @@ async function saveToSheet(record){
   }
 }
 
-/* fetch list */
 async function fetchAllPatients(){
   try {
     const res = await fetch(APPS_SCRIPT_URL);
@@ -204,7 +188,6 @@ async function fetchAllPatients(){
   }
 }
 
-/* UI helpers */
 function setStatus(t){ if(llmStatus) llmStatus.textContent = `AI status: ${t}`; }
 function escapeHtml(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -227,7 +210,6 @@ function showPatientPage(p){
   `;
 }
 
-/* table render */
 function renderPatientsTable(rows){
   patientsTableBody.innerHTML = '';
   if(!Array.isArray(rows)) return;
@@ -251,7 +233,6 @@ function renderPatientsTable(rows){
   }));
 }
 
-/* form submit flow */
 form.addEventListener('submit', async ev=>{
   ev.preventDefault();
   const fd = new FormData(form);
@@ -271,7 +252,6 @@ form.addEventListener('submit', async ev=>{
 
     const triage = { urgency: ai.urgency||'yellow', doctor: ai.doctor||'general physician', ai_notes: ai.ai_notes||'', raw: ai.raw||'' };
 
-    // prefill override fields so user can change if they want
     overrideUrgency.value = triage.urgency;
     overrideDoctor.value = triage.doctor;
     overrideNotes.value = triage.ai_notes;
@@ -282,7 +262,6 @@ form.addEventListener('submit', async ev=>{
       overrideBox.classList.remove('hidden');
       setStatus('AI parse issues — review before saving.');
     } else {
-      // auto-save
       try { await doSaveRecord({...patient,...triage}); }
       catch(saveErr){ console.error('Auto-save failed', saveErr); overrideBox.classList.remove('hidden'); overrideNotes.value = 'Save failed: '+saveErr.message; alert('Auto-save failed. Please Save to Sheet manually.'); setStatus('idle'); }
     }
@@ -295,7 +274,6 @@ form.addEventListener('submit', async ev=>{
   } finally { btnSubmit.disabled = false; }
 });
 
-/* manual save */
 btnSaveManual.addEventListener('click', async ()=>{
   const fd = new FormData(form);
   const patient = Object.fromEntries(fd.entries());
@@ -320,12 +298,10 @@ async function doSaveRecord(record){
   } catch(err){ setStatus('save failed'); throw err; }
 }
 
-/* UI extras */
 btnClear.addEventListener('click', ()=>form.reset());
 backFromPatient.addEventListener('click', ()=>{ patientView.classList.add('hidden'); formView.classList.remove('hidden'); });
 btnPrint.addEventListener('click', ()=>window.print());
 btnViewAll.addEventListener('click', async ()=>{ formView.classList.add('hidden'); patientView.classList.add('hidden'); listView.classList.remove('hidden'); setStatus('loading'); try{ const data = await fetchAllPatients(); renderPatientsTable(Array.isArray(data)?data:[]); setStatus('idle'); }catch(e){ setStatus('idle'); alert('Error: '+e.message); }});
 backFromList.addEventListener('click', ()=>{ listView.classList.add('hidden'); formView.classList.remove('hidden'); });
 
-/* init */
 (function init(){ setStatus('idle'); console.log('AI-first specialties: model decides doctor; fallback only on parse failure.'); })();

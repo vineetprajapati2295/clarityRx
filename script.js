@@ -305,3 +305,4 @@ btnViewAll.addEventListener('click', async ()=>{ formView.classList.add('hidden'
 backFromList.addEventListener('click', ()=>{ listView.classList.add('hidden'); formView.classList.remove('hidden'); });
 
 (function init(){ setStatus('idle'); console.log('AI-first specialties: model decides doctor; fallback only on parse failure.'); })();
+
